@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14161c">
+<title>マイボイス — 声クローン音声生成</title>
+<style>
+  :root {
+    --bg: #14161c; --card: #1e212b; --line: #2f3442; --text: #eceef4; --sub: #9aa1b4;
+    --accent: #ff7a59; --accent2: #ffb199; --ok: #5fd39a; --err: #ff6b7a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    font-size: 16px; line-height: 1.6;
+    padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 40px);
+  }
+  main { max-width: 560px; margin: 0 auto; }
+  header { padding: 28px 0 8px; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: .04em; }
+  h1 span { color: var(--accent); }
+  header p { margin: 4px 0 0; color: var(--sub); font-size: 13px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-top: 16px; }
+  h2 { margin: 0 0 12px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  h2 i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #14161c;
+         font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+  label { display: block; font-size: 13px; color: var(--sub); margin: 12px 0 4px; }
+  input[type=text], input[type=password], textarea, select {
+    width: 100%; background: #14161c; color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px; font-size: 16px; font-family: inherit;
+  }
+  textarea { min-height: 120px; resize: vertical; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 13px 16px; min-height: 48px;
+    background: var(--accent); color: #14161c; width: 100%; margin-top: 14px; cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button.small { width: auto; min-height: 36px; padding: 6px 12px; margin: 0; font-size: 13px; }
+  button:disabled { opacity: .45; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .note { font-size: 12px; color: var(--sub); margin-top: 8px; }
+  .script { background: #14161c; border-left: 3px solid var(--accent2); border-radius: 8px; padding: 12px; font-size: 14px; margin-top: 8px; }
+  .rec { background: var(--err); color: #fff; }
+  .timer { font-variant-numeric: tabular-nums; font-size: 28px; font-weight: 700; text-align: center; margin-top: 12px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; font-size: 13px; color: var(--text); }
+  .check input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--accent); flex: none; }
+  audio { width: 100%; margin-top: 12px; }
+  .msg { font-size: 13px; margin-top: 10px; min-height: 1.4em; }
+  .msg.ok { color: var(--ok); } .msg.err { color: var(--err); }
+  .voice { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .voice:first-child { border-top: 0; }
+  .range { display: flex; align-items: center; gap: 10px; }
+  .range input { flex: 1; accent-color: var(--accent); }
+  .range output { width: 2.5em; text-align: right; font-size: 13px; color: var(--sub); }
+  .count { text-align: right; font-size: 12px; color: var(--sub); }
+  a { color: var(--accent2); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>マイ<span>ボイス</span></h1>
+    <p>自分の声を登録して、好きな文章をその声で読み上げます（ElevenLabs API 使用）</p>
+  </header>
+
+  <section>
+    <h2><i>1</i>APIキー</h2>
+    <input type="password" id="apiKey" placeholder="sk_..." autocomplete="off">
+    <p class="note">キーはこの端末のブラウザ内だけに保存され、ElevenLabs 以外には送信されません。
+      <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener">キーの取得はこちら</a></p>
+    <button id="saveKey">保存して声の一覧を読み込む</button>
+    <div class="msg" id="keyMsg"></div>
+  </section>
+
+  <section>
+    <h2><i>2</i>声を登録する</h2>
+    <p class="note" style="margin-top:0">静かな場所で、下の文章などを30秒〜1分以上、普段の話し方で読んでください。</p>
+    <div class="script">
+      こんにちは。今日は私の声を登録するために、少し長めの文章を読んでいます。
+      朝は早く起きて、温かいお茶を飲みながら一日の予定を確認するのが好きです。
+      晴れた日には近所を散歩して、季節の移り変わりを感じます。
+      うれしいとき、驚いたとき、落ち着いて説明するとき。いろいろな調子で話してみますね。
+      えっ、本当ですか？それはすごい！……では、最後にゆっくりと数字を読みます。
+      いち、に、さん、よん、ご、ろく、なな、はち、きゅう、じゅう。ありがとうございました。
+    </div>
+    <div class="timer" id="timer">00:00</div>
+    <div class="row">
+      <button id="recBtn">● 録音する</button>
+      <button class="ghost" id="fileBtn">ファイルを選ぶ</button>
+    </div>
+    <input type="file" id="fileInput" accept="audio/*" multiple hidden>
+    <audio id="samplePlayer" controls hidden></audio>
+    <div class="note" id="sampleInfo"></div>
+
+    <label for="voiceName">声の名前</label>
+    <input type="text" id="voiceName" placeholder="例：しのだの声" maxlength="40">
+    <label class="check"><input type="checkbox" id="denoise" checked><span>背景ノイズを除去する</span></label>
+    <label class="check"><input type="checkbox" id="consent">
+      <span>この音声は自分自身の声、または本人から明確な同意を得た声です。</span></label>
+    <button id="cloneBtn" disabled>この声を登録する</button>
+    <div class="msg" id="cloneMsg"></div>
+  </section>
+
+  <section>
+    <h2><i>3</i>音声を生成する</h2>
+    <label for="voiceSel">声</label>
+    <select id="voiceSel"><option value="">（APIキーを保存すると表示されます）</option></select>
+    <label for="modelSel">モデル</label>
+    <select id="modelSel">
+      <option value="eleven_multilingual_v2">Multilingual v2（安定・標準）</option>
+      <option value="eleven_v3">Eleven v3（表現力が高い）</option>
+      <option value="eleven_flash_v2_5">Flash v2.5（速い・安い）</option>
+    </select>
+    <label for="text">読み上げる文章</label>
+    <textarea id="text" placeholder="ここに文章を入力"></textarea>
+    <div class="count"><span id="charCount">0</span> 文字</div>
+    <div id="settings">
+      <label>安定性（低いほど感情豊か）</label>
+      <div class="range"><input type="range" id="stab" min="0" max="1" step="0.05" value="0.5"><output id="stabOut">0.50</output></div>
+      <label>本人らしさ</label>
+      <div class="range"><input type="range" id="sim" min="0" max="1" step="0.05" value="0.8"><output id="simOut">0.80</output></div>
+    </div>
+    <button id="genBtn">音声を生成</button>
+    <div class="msg" id="genMsg"></div>
+    <audio id="outPlayer" controls hidden></audio>
+    <div class="row" id="outActions" hidden>
+      <button class="ghost" id="dlBtn">MP3を保存</button>
+      <button class="ghost" id="shareBtn">共有</button>
+    </div>
+  </section>
+
+  <section>
+    <h2><i>4</i>登録した声の管理</h2>
+    <div id="voiceList"><p class="note" style="margin:0">まだ読み込まれていません。</p></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const API = 'https://api.elevenlabs.io';
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+  };
+  let samples = [];      // File[] to upload
+  let outBlob = null;    // generated mp3
+  let recorder = null, recChunks = [], recStream = null, recStart = 0, recTick = null;
+
+  const msg = (el, text, kind) => { el.textContent = text; el.className = 'msg' + (kind ? ' ' + kind : ''); };
+  const key = () => $('apiKey').value.trim();
+
+  async function api(path, opts = {}) {
+    if (!key()) throw new Error('APIキーを入力してください。');
+    const res = await fetch(API + path, { ...opts, headers: { 'xi-api-key': key(), ...(opts.headers || {}) } });
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const j = await res.json();
+        const d = j.detail;
+        detail = typeof d === 'string' ? d : (d && (d.message || d.status)) || JSON.stringify(j);
+      } catch {}
+      if (res.status === 401) detail = 'APIキーが正しくないか、権限が不足しています。' + (detail ? '（' + detail + '）' : '');
+      throw new Error(detail || ('エラー ' + res.status));
+    }
+    return res;
+  }
+
+  // ---------- voices ----------
+  async function loadVoices() {
+    const res = await api('/v1/voices');
+    const { voices = [] } = await res.json();
+    const mine = voices.filter(v => v.category === 'cloned');
+    const others = voices.filter(v => v.category !== 'cloned');
+    const sel = $('voiceSel');
+    const last = store.get('mv_voice');
+    sel.innerHTML = '';
+    const addGroup = (label, list) => {
+      if (!list.length) return;
+      const g = document.createElement('optgroup'); g.label = label;
+      list.forEach(v => { const o = document.createElement('option'); o.value = v.voice_id; o.textContent = v.name; g.appendChild(o); });
+      sel.appendChild(g);
+    };
+    addGroup('登録した声', mine);
+    addGroup('その他の声', others);
+    if (!voices.length) sel.innerHTML = '<option value="">声がありません</option>';
+    if (last && [...sel.options].some(o => o.value === last)) sel.value = last;
+
+    const box = $('voiceList');
+    box.innerHTML = '';
+    if (!mine.length) { box.innerHTML = '<p class="note" style="margin:0">登録した声はまだありません。</p>'; return mine.length; }
+    mine.forEach(v => {
+      const row = document.createElement('div'); row.className = 'voice';
+      const name = document.createElement('span'); name.textContent = v.name;
+      const del = document.createElement('button'); del.className = 'ghost small'; del.textContent = '削除';
+      del.onclick = async () => {
+        if (del.dataset.armed !== '1') { del.dataset.armed = '1'; del.textContent = '本当に削除'; setTimeout(() => { del.dataset.armed = ''; del.textContent = '削除'; }, 4000); return; }
+        del.disabled = true;
+        try { await api('/v1/voices/' + encodeURIComponent(v.voice_id), { method: 'DELETE' }); await loadVoices(); }
+        catch (e) { del.disabled = false; del.textContent = '失敗: ' + e.message; }
+      };
+      row.append(name, del); box.appendChild(row);
+    });
+    return mine.length;
+  }
+
+  $('saveKey').onclick = async () => {
+    store.set('mv_key', key());
+    msg($('keyMsg'), '読み込み中…');
+    try { const n = await loadVoices(); msg($('keyMsg'), '保存しました。登録済みの声: ' + n + ' 件', 'ok'); }
+    catch (e) { msg($('keyMsg'), e.message, 'err'); }
+  };
+
+  // ---------- sample (record / file) ----------
+  function setSamples(files, label) {
+    samples = files;
+    const p = $('samplePlayer');
+    if (files.length) { p.src = URL.createObjectURL(files[0]); p.hidden = false; }
+    else { p.hidden = true; }
+    $('sampleInfo').textContent = label || '';
+    updateCloneBtn();
+  }
+  function updateCloneBtn() {
+    $('cloneBtn').disabled = !(samples.length && $('consent').checked && $('voiceName').value.trim());
+  }
+  $('consent').onchange = updateCloneBtn;
+  $('voiceName').oninput = updateCloneBtn;
+
+  const fmt = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+
+  $('recBtn').onclick = async () => {
+    const btn = $('recBtn');
+    if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
+    if (!navigator.mediaDevices || !window.MediaRecorder) { msg($('cloneMsg'), 'このブラウザは録音に対応していません。ファイルを選んでください。', 'err'); return; }
+    try {
+      recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch { msg($('cloneMsg'), 'マイクの使用が許可されていません。', 'err'); return; }
+    recChunks = [];
+    recorder = new MediaRecorder(recStream);
+    recorder.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+    recorder.onstop = () => {
+      clearInterval(recTick);
+      recStream.getTracks().forEach(t => t.stop());
+      const secs = (Date.now() - recStart) / 1000;
+      const type = recorder.mimeType || 'audio/mp4';
+      const ext = type.includes('webm') ? 'webm' : type.includes('ogg') ? 'ogg' : 'm4a';
+      const file = new File(recChunks, 'sample.' + ext, { type });
+      btn.textContent = '● 録り直す'; btn.classList.remove('rec');
+      setSamples([file], '録音 ' + fmt(secs) + (secs < 30 ? '（短めです。30秒以上がおすすめ）' : ''));
+    };
+    recorder.start();
+    recStart = Date.now();
+    $('timer').textContent = '00:00';
+    recTick = setInterval(() => { $('timer').textContent = fmt((Date.now() - recStart) / 1000); }, 250);
+    btn.textContent = '■ 録音を止める'; btn.classList.add('rec');
+    msg($('cloneMsg'), '');
+  };
+
+  $('fileBtn').onclick = () => $('fileInput').click();
+  $('fileInput').onchange = e => {
+    const files = [...e.target.files];
+    if (files.length) setSamples(files, files.map(f => f.name).join('、'));
+  };
+
+  $('cloneBtn').onclick = async () => {
+    const btn = $('cloneBtn');
+    btn.disabled = true; msg($('cloneMsg'), '登録中…（数秒〜数十秒かかります）');
+    try {
+      const fd = new FormData();
+      fd.append('name', $('voiceName').value.trim());
+      fd.append('remove_background_noise', $('denoise').checked ? 'true' : 'false');
+      samples.forEach(f => fd.append('files', f, f.name));
+      const res = await api('/v1/voices/add', { method: 'POST', body: fd });
+      const j = await res.json();
+      store.set('mv_voice', j.voice_id);
+      await loadVoices();
+      msg($('cloneMsg'), '登録しました。下の「音声を生成する」で使えます。', 'ok');
+    } catch (e) { msg($('cloneMsg'), '登録できませんでした: ' + e.message, 'err'); }
+    updateCloneBtn();
+  };
+
+  // ---------- generate ----------
+  const bindRange = (id, out) => { $(id).oninput = () => { $(out).textContent = Number($(id).value).toFixed(2); }; };
+  bindRange('stab', 'stabOut'); bindRange('sim', 'simOut');
+  $('text').oninput = () => { $('charCount').textContent = $('text').value.length; };
+  $('modelSel').onchange = () => { $('settings').hidden = $('modelSel').value === 'eleven_v3'; };
+  $('voiceSel').onchange = () => store.set('mv_voice', $('voiceSel').value);
+
+  $('genBtn').onclick = async () => {
+    const btn = $('genBtn');
+    const voice = $('voiceSel').value, text = $('text').value.trim(), model = $('modelSel').value;
+    if (!voice) return msg($('genMsg'), '声を選んでください。', 'err');
+    if (!text) return msg($('genMsg'), '文章を入力してください。', 'err');
+    btn.disabled = true; msg($('genMsg'), '生成中…');
+    try {
+      const body = { text, model_id: model };
+      if (model !== 'eleven_v3') {
+        body.voice_settings = { stability: Number($('stab').value), similarity_boost: Number($('sim').value) };
+      }
+      const res = await api('/v1/text-to-speech/' + encodeURIComponent(voice) + '?output_format=mp3_44100_128', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      outBlob = await res.blob();
+      const p = $('outPlayer');
+      p.src = URL.createObjectURL(outBlob); p.hidden = false;
+      $('outActions').hidden = false;
+      $('shareBtn').hidden = !(navigator.canShare && navigator.canShare({ files: [outFile()] }));
+      msg($('genMsg'), '生成しました。', 'ok');
+      p.play().catch(() => {});
+    } catch (e) { msg($('genMsg'), '生成できませんでした: ' + e.message, 'err'); }
+    btn.disabled = false;
+  };
+
+  function outFile() {
+    const d = new Date(), z = n => String(n).padStart(2, '0');
+    const name = 'voice_' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '_' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()) + '.mp3';
+    return new File([outBlob], name, { type: 'audio/mpeg' });
+  }
+  $('dlBtn').onclick = () => {
+    if (!outBlob) return;
+    const f = outFile(), a = document.createElement('a');
+    a.href = URL.createObjectURL(f); a.download = f.name;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  $('shareBtn').onclick = async () => {
+    if (!outBlob) return;
+    try { await navigator.share({ files: [outFile()] }); } catch {}
+  };
+
+  // ---------- init ----------
+  $('apiKey').value = store.get('mv_key');
+  if (key()) loadVoices().then(n => msg($('keyMsg'), '登録済みの声: ' + n + ' 件', 'ok')).catch(e => msg($('keyMsg'), e.message, 'err'));
+})();
+</script>
+</body>
+</html>
