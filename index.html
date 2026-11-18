@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14161c">
-<title>マイボイス — 声クローン音声生成</title>
+<title>マイボイス — 音声生成</title>
 <style>
   :root {
     --bg: #14161c; --card: #1e212b; --line: #2f3442; --text: #eceef4; --sub: #9aa1b4;
@@ -27,36 +27,36 @@
   h2 i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #14161c;
          font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
   label { display: block; font-size: 13px; color: var(--sub); margin: 12px 0 4px; }
-  input[type=text], input[type=password], textarea, select {
+  input[type=password], textarea, select {
     width: 100%; background: #14161c; color: var(--text); border: 1px solid var(--line);
     border-radius: 10px; padding: 12px; font-size: 16px; font-family: inherit;
   }
-  textarea { min-height: 120px; resize: vertical; }
+  textarea { min-height: 140px; resize: vertical; }
   input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   button {
     font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 13px 16px; min-height: 48px;
     background: var(--accent); color: #14161c; width: 100%; margin-top: 14px; cursor: pointer;
   }
   button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
-  button.small { width: auto; min-height: 36px; padding: 6px 12px; margin: 0; font-size: 13px; }
   button:disabled { opacity: .45; }
   .row { display: flex; gap: 10px; }
   .row > * { flex: 1; }
+  .pick { display: flex; gap: 8px; align-items: stretch; }
+  .pick select { flex: 1; }
+  .pick button { width: auto; margin: 0; padding: 0 14px; flex: none; }
   .note { font-size: 12px; color: var(--sub); margin-top: 8px; }
-  .script { background: #14161c; border-left: 3px solid var(--accent2); border-radius: 8px; padding: 12px; font-size: 14px; margin-top: 8px; }
-  .rec { background: var(--err); color: #fff; }
-  .timer { font-variant-numeric: tabular-nums; font-size: 28px; font-weight: 700; text-align: center; margin-top: 12px; }
-  .check { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; font-size: 13px; color: var(--text); }
-  .check input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--accent); flex: none; }
+  .desc { font-size: 12px; color: var(--sub); margin-top: 6px; min-height: 1.4em; }
   audio { width: 100%; margin-top: 12px; }
   .msg { font-size: 13px; margin-top: 10px; min-height: 1.4em; }
   .msg.ok { color: var(--ok); } .msg.err { color: var(--err); }
-  .voice { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
-  .voice:first-child { border-top: 0; }
   .range { display: flex; align-items: center; gap: 10px; }
   .range input { flex: 1; accent-color: var(--accent); }
   .range output { width: 2.5em; text-align: right; font-size: 13px; color: var(--sub); }
   .count { text-align: right; font-size: 12px; color: var(--sub); }
+  .hist { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .hist:first-child { border-top: 0; }
+  .hist span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist button { width: auto; min-height: 36px; padding: 4px 12px; margin: 0; font-size: 13px; }
   a { color: var(--accent2); }
 </style>
 </head>
@@ -64,7 +64,7 @@
 <main>
   <header>
     <h1>マイ<span>ボイス</span></h1>
-    <p>自分の声を登録して、好きな文章をその声で読み上げます（ElevenLabs API 使用）</p>
+    <p>文章を入力して、好きな声で読み上げます（ElevenLabs API 使用）</p>
   </header>
 
   <section>
@@ -77,53 +77,34 @@
   </section>
 
   <section>
-    <h2><i>2</i>声を登録する</h2>
-    <p class="note" style="margin-top:0">静かな場所で、下の文章などを30秒〜1分以上、普段の話し方で読んでください。</p>
-    <div class="script">
-      こんにちは。今日は私の声を登録するために、少し長めの文章を読んでいます。
-      朝は早く起きて、温かいお茶を飲みながら一日の予定を確認するのが好きです。
-      晴れた日には近所を散歩して、季節の移り変わりを感じます。
-      うれしいとき、驚いたとき、落ち着いて説明するとき。いろいろな調子で話してみますね。
-      えっ、本当ですか？それはすごい！……では、最後にゆっくりと数字を読みます。
-      いち、に、さん、よん、ご、ろく、なな、はち、きゅう、じゅう。ありがとうございました。
-    </div>
-    <div class="timer" id="timer">00:00</div>
-    <div class="row">
-      <button id="recBtn">● 録音する</button>
-      <button class="ghost" id="fileBtn">ファイルを選ぶ</button>
-    </div>
-    <input type="file" id="fileInput" accept="audio/*" multiple hidden>
-    <audio id="samplePlayer" controls hidden></audio>
-    <div class="note" id="sampleInfo"></div>
-
-    <label for="voiceName">声の名前</label>
-    <input type="text" id="voiceName" placeholder="例：しのだの声" maxlength="40">
-    <label class="check"><input type="checkbox" id="denoise" checked><span>背景ノイズを除去する</span></label>
-    <label class="check"><input type="checkbox" id="consent">
-      <span>この音声は自分自身の声、または本人から明確な同意を得た声です。</span></label>
-    <button id="cloneBtn" disabled>この声を登録する</button>
-    <div class="msg" id="cloneMsg"></div>
-  </section>
-
-  <section>
-    <h2><i>3</i>音声を生成する</h2>
+    <h2><i>2</i>音声を生成する</h2>
     <label for="voiceSel">声</label>
-    <select id="voiceSel"><option value="">（APIキーを保存すると表示されます）</option></select>
+    <div class="pick">
+      <select id="voiceSel"><option value="">（APIキーを保存すると表示されます）</option></select>
+      <button class="ghost" id="previewBtn" title="試聴">▶ 試聴</button>
+    </div>
+    <div class="desc" id="voiceDesc"></div>
+
     <label for="modelSel">モデル</label>
     <select id="modelSel">
       <option value="eleven_multilingual_v2">Multilingual v2（安定・標準）</option>
       <option value="eleven_v3">Eleven v3（表現力が高い）</option>
       <option value="eleven_flash_v2_5">Flash v2.5（速い・安い）</option>
     </select>
+
     <label for="text">読み上げる文章</label>
     <textarea id="text" placeholder="ここに文章を入力"></textarea>
     <div class="count"><span id="charCount">0</span> 文字</div>
+
     <div id="settings">
       <label>安定性（低いほど感情豊か）</label>
       <div class="range"><input type="range" id="stab" min="0" max="1" step="0.05" value="0.5"><output id="stabOut">0.50</output></div>
-      <label>本人らしさ</label>
-      <div class="range"><input type="range" id="sim" min="0" max="1" step="0.05" value="0.8"><output id="simOut">0.80</output></div>
+      <label>声の再現度</label>
+      <div class="range"><input type="range" id="sim" min="0" max="1" step="0.05" value="0.75"><output id="simOut">0.75</output></div>
+      <label>話す速さ</label>
+      <div class="range"><input type="range" id="speed" min="0.7" max="1.2" step="0.05" value="1"><output id="speedOut">1.00</output></div>
     </div>
+
     <button id="genBtn">音声を生成</button>
     <div class="msg" id="genMsg"></div>
     <audio id="outPlayer" controls hidden></audio>
@@ -134,10 +115,12 @@
   </section>
 
   <section>
-    <h2><i>4</i>登録した声の管理</h2>
-    <div id="voiceList"><p class="note" style="margin:0">まだ読み込まれていません。</p></div>
+    <h2><i>3</i>今回作った音声</h2>
+    <div id="history"><p class="note" style="margin:0">まだありません（ページを閉じると消えます）。</p></div>
   </section>
 </main>
+
+<audio id="previewPlayer" hidden></audio>
 
 <script>
 (() => {
@@ -147,9 +130,9 @@
     get(k) { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch {} }
   };
-  let samples = [];      // File[] to upload
-  let outBlob = null;    // generated mp3
-  let recorder = null, recChunks = [], recStream = null, recStart = 0, recTick = null;
+  let voices = [];
+  let current = null;   // { blob, name }
+  const history = [];
 
   const msg = (el, text, kind) => { el.textContent = text; el.className = 'msg' + (kind ? ' ' + kind : ''); };
   const key = () => $('apiKey').value.trim();
@@ -165,175 +148,140 @@
         detail = typeof d === 'string' ? d : (d && (d.message || d.status)) || JSON.stringify(j);
       } catch {}
       if (res.status === 401) detail = 'APIキーが正しくないか、権限が不足しています。' + (detail ? '（' + detail + '）' : '');
+      if (/quota|credits/i.test(detail)) detail = '今月のクレジットが足りません。文章を短くするか、来月まで待ってください。（' + detail + '）';
       throw new Error(detail || ('エラー ' + res.status));
     }
     return res;
   }
 
   // ---------- voices ----------
+  const GENDER = { male: '男性', female: '女性', neutral: '中性' };
+  const AGE = { young: '若い', middle_aged: '中年', 'middle aged': '中年', old: '年配' };
+  function describe(v) {
+    const l = v.labels || {};
+    return [GENDER[l.gender] || l.gender, AGE[l.age] || l.age, l.accent, l.descriptive || l.description, l.use_case || l['use case']]
+      .filter(Boolean).join(' / ');
+  }
+
   async function loadVoices() {
     const res = await api('/v1/voices');
-    const { voices = [] } = await res.json();
-    const mine = voices.filter(v => v.category === 'cloned');
-    const others = voices.filter(v => v.category !== 'cloned');
+    ({ voices = [] } = await res.json());
     const sel = $('voiceSel');
     const last = store.get('mv_voice');
     sel.innerHTML = '';
-    const addGroup = (label, list) => {
+    const groups = [['女性', v => (v.labels || {}).gender === 'female'], ['男性', v => (v.labels || {}).gender === 'male'], ['その他', v => !['female', 'male'].includes((v.labels || {}).gender)]];
+    groups.forEach(([label, test]) => {
+      const list = voices.filter(test);
       if (!list.length) return;
       const g = document.createElement('optgroup'); g.label = label;
       list.forEach(v => { const o = document.createElement('option'); o.value = v.voice_id; o.textContent = v.name; g.appendChild(o); });
       sel.appendChild(g);
-    };
-    addGroup('登録した声', mine);
-    addGroup('その他の声', others);
-    if (!voices.length) sel.innerHTML = '<option value="">声がありません</option>';
-    if (last && [...sel.options].some(o => o.value === last)) sel.value = last;
-
-    const box = $('voiceList');
-    box.innerHTML = '';
-    if (!mine.length) { box.innerHTML = '<p class="note" style="margin:0">登録した声はまだありません。</p>'; return mine.length; }
-    mine.forEach(v => {
-      const row = document.createElement('div'); row.className = 'voice';
-      const name = document.createElement('span'); name.textContent = v.name;
-      const del = document.createElement('button'); del.className = 'ghost small'; del.textContent = '削除';
-      del.onclick = async () => {
-        if (del.dataset.armed !== '1') { del.dataset.armed = '1'; del.textContent = '本当に削除'; setTimeout(() => { del.dataset.armed = ''; del.textContent = '削除'; }, 4000); return; }
-        del.disabled = true;
-        try { await api('/v1/voices/' + encodeURIComponent(v.voice_id), { method: 'DELETE' }); await loadVoices(); }
-        catch (e) { del.disabled = false; del.textContent = '失敗: ' + e.message; }
-      };
-      row.append(name, del); box.appendChild(row);
     });
-    return mine.length;
+    if (!voices.length) sel.innerHTML = '<option value="">声がありません</option>';
+    if (last && voices.some(v => v.voice_id === last)) sel.value = last;
+    showDesc();
+    return voices.length;
   }
+  function selectedVoice() { return voices.find(v => v.voice_id === $('voiceSel').value); }
+  function showDesc() { const v = selectedVoice(); $('voiceDesc').textContent = v ? describe(v) : ''; }
+
+  $('voiceSel').onchange = () => { store.set('mv_voice', $('voiceSel').value); showDesc(); stopPreview(); };
+
+  const pp = $('previewPlayer');
+  function stopPreview() { pp.pause(); $('previewBtn').textContent = '▶ 試聴'; }
+  pp.onended = stopPreview;
+  $('previewBtn').onclick = () => {
+    const v = selectedVoice();
+    if (!v || !v.preview_url) { $('voiceDesc').textContent = 'この声には試聴音声がありません。'; return; }
+    if (!pp.paused) { stopPreview(); return; }
+    pp.src = v.preview_url;
+    pp.play().then(() => { $('previewBtn').textContent = '■ 停止'; }).catch(() => {});
+  };
 
   $('saveKey').onclick = async () => {
     store.set('mv_key', key());
     msg($('keyMsg'), '読み込み中…');
-    try { const n = await loadVoices(); msg($('keyMsg'), '保存しました。登録済みの声: ' + n + ' 件', 'ok'); }
+    try { const n = await loadVoices(); msg($('keyMsg'), '保存しました。使える声: ' + n + ' 種類', 'ok'); }
     catch (e) { msg($('keyMsg'), e.message, 'err'); }
-  };
-
-  // ---------- sample (record / file) ----------
-  function setSamples(files, label) {
-    samples = files;
-    const p = $('samplePlayer');
-    if (files.length) { p.src = URL.createObjectURL(files[0]); p.hidden = false; }
-    else { p.hidden = true; }
-    $('sampleInfo').textContent = label || '';
-    updateCloneBtn();
-  }
-  function updateCloneBtn() {
-    $('cloneBtn').disabled = !(samples.length && $('consent').checked && $('voiceName').value.trim());
-  }
-  $('consent').onchange = updateCloneBtn;
-  $('voiceName').oninput = updateCloneBtn;
-
-  const fmt = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Math.floor(s % 60)).padStart(2, '0');
-
-  $('recBtn').onclick = async () => {
-    const btn = $('recBtn');
-    if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
-    if (!navigator.mediaDevices || !window.MediaRecorder) { msg($('cloneMsg'), 'このブラウザは録音に対応していません。ファイルを選んでください。', 'err'); return; }
-    try {
-      recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch { msg($('cloneMsg'), 'マイクの使用が許可されていません。', 'err'); return; }
-    recChunks = [];
-    recorder = new MediaRecorder(recStream);
-    recorder.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
-    recorder.onstop = () => {
-      clearInterval(recTick);
-      recStream.getTracks().forEach(t => t.stop());
-      const secs = (Date.now() - recStart) / 1000;
-      const type = recorder.mimeType || 'audio/mp4';
-      const ext = type.includes('webm') ? 'webm' : type.includes('ogg') ? 'ogg' : 'm4a';
-      const file = new File(recChunks, 'sample.' + ext, { type });
-      btn.textContent = '● 録り直す'; btn.classList.remove('rec');
-      setSamples([file], '録音 ' + fmt(secs) + (secs < 30 ? '（短めです。30秒以上がおすすめ）' : ''));
-    };
-    recorder.start();
-    recStart = Date.now();
-    $('timer').textContent = '00:00';
-    recTick = setInterval(() => { $('timer').textContent = fmt((Date.now() - recStart) / 1000); }, 250);
-    btn.textContent = '■ 録音を止める'; btn.classList.add('rec');
-    msg($('cloneMsg'), '');
-  };
-
-  $('fileBtn').onclick = () => $('fileInput').click();
-  $('fileInput').onchange = e => {
-    const files = [...e.target.files];
-    if (files.length) setSamples(files, files.map(f => f.name).join('、'));
-  };
-
-  $('cloneBtn').onclick = async () => {
-    const btn = $('cloneBtn');
-    btn.disabled = true; msg($('cloneMsg'), '登録中…（数秒〜数十秒かかります）');
-    try {
-      const fd = new FormData();
-      fd.append('name', $('voiceName').value.trim());
-      fd.append('remove_background_noise', $('denoise').checked ? 'true' : 'false');
-      samples.forEach(f => fd.append('files', f, f.name));
-      const res = await api('/v1/voices/add', { method: 'POST', body: fd });
-      const j = await res.json();
-      store.set('mv_voice', j.voice_id);
-      await loadVoices();
-      msg($('cloneMsg'), '登録しました。下の「音声を生成する」で使えます。', 'ok');
-    } catch (e) { msg($('cloneMsg'), '登録できませんでした: ' + e.message, 'err'); }
-    updateCloneBtn();
   };
 
   // ---------- generate ----------
   const bindRange = (id, out) => { $(id).oninput = () => { $(out).textContent = Number($(id).value).toFixed(2); }; };
-  bindRange('stab', 'stabOut'); bindRange('sim', 'simOut');
-  $('text').oninput = () => { $('charCount').textContent = $('text').value.length; };
-  $('modelSel').onchange = () => { $('settings').hidden = $('modelSel').value === 'eleven_v3'; };
-  $('voiceSel').onchange = () => store.set('mv_voice', $('voiceSel').value);
+  bindRange('stab', 'stabOut'); bindRange('sim', 'simOut'); bindRange('speed', 'speedOut');
+  $('text').value = store.get('mv_text');
+  const updCount = () => { $('charCount').textContent = $('text').value.length; };
+  $('text').oninput = () => { updCount(); store.set('mv_text', $('text').value); };
+  updCount();
+  const savedModel = store.get('mv_model');
+  if (savedModel) $('modelSel').value = savedModel;
+  const updModel = () => { $('settings').hidden = $('modelSel').value === 'eleven_v3'; store.set('mv_model', $('modelSel').value); };
+  $('modelSel').onchange = updModel; updModel();
+
+  function stamp() {
+    const d = new Date(), z = n => String(n).padStart(2, '0');
+    return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '_' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds());
+  }
+  const toFile = item => new File([item.blob], item.name, { type: 'audio/mpeg' });
 
   $('genBtn').onclick = async () => {
     const btn = $('genBtn');
     const voice = $('voiceSel').value, text = $('text').value.trim(), model = $('modelSel').value;
     if (!voice) return msg($('genMsg'), '声を選んでください。', 'err');
     if (!text) return msg($('genMsg'), '文章を入力してください。', 'err');
+    stopPreview();
     btn.disabled = true; msg($('genMsg'), '生成中…');
     try {
       const body = { text, model_id: model };
       if (model !== 'eleven_v3') {
-        body.voice_settings = { stability: Number($('stab').value), similarity_boost: Number($('sim').value) };
+        body.voice_settings = {
+          stability: Number($('stab').value),
+          similarity_boost: Number($('sim').value),
+          speed: Number($('speed').value)
+        };
       }
       const res = await api('/v1/text-to-speech/' + encodeURIComponent(voice) + '?output_format=mp3_44100_128', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
-      outBlob = await res.blob();
+      const blob = await res.blob();
+      const v = selectedVoice();
+      current = { blob, name: 'voice_' + stamp() + '.mp3', label: (v ? v.name.split(' - ')[0] : '') + '：' + text.slice(0, 30) };
+      history.unshift(current);
+      renderHistory();
       const p = $('outPlayer');
-      p.src = URL.createObjectURL(outBlob); p.hidden = false;
+      p.src = URL.createObjectURL(blob); p.hidden = false;
       $('outActions').hidden = false;
-      $('shareBtn').hidden = !(navigator.canShare && navigator.canShare({ files: [outFile()] }));
+      $('shareBtn').hidden = !(navigator.canShare && navigator.canShare({ files: [toFile(current)] }));
       msg($('genMsg'), '生成しました。', 'ok');
       p.play().catch(() => {});
     } catch (e) { msg($('genMsg'), '生成できませんでした: ' + e.message, 'err'); }
     btn.disabled = false;
   };
 
-  function outFile() {
-    const d = new Date(), z = n => String(n).padStart(2, '0');
-    const name = 'voice_' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '_' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()) + '.mp3';
-    return new File([outBlob], name, { type: 'audio/mpeg' });
-  }
-  $('dlBtn').onclick = () => {
-    if (!outBlob) return;
-    const f = outFile(), a = document.createElement('a');
-    a.href = URL.createObjectURL(f); a.download = f.name;
+  function download(item) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(item.blob); a.download = item.name;
     document.body.appendChild(a); a.click(); a.remove();
-  };
-  $('shareBtn').onclick = async () => {
-    if (!outBlob) return;
-    try { await navigator.share({ files: [outFile()] }); } catch {}
-  };
+  }
+  $('dlBtn').onclick = () => current && download(current);
+  $('shareBtn').onclick = async () => { if (current) { try { await navigator.share({ files: [toFile(current)] }); } catch {} } };
+
+  function renderHistory() {
+    const box = $('history');
+    box.innerHTML = '';
+    history.forEach(item => {
+      const row = document.createElement('div'); row.className = 'hist';
+      const t = document.createElement('span'); t.textContent = item.label;
+      const play = document.createElement('button'); play.className = 'ghost'; play.textContent = '▶';
+      play.onclick = () => { const p = $('outPlayer'); p.src = URL.createObjectURL(item.blob); p.hidden = false; current = item; $('outActions').hidden = false; p.play().catch(() => {}); };
+      const dl = document.createElement('button'); dl.className = 'ghost'; dl.textContent = '保存';
+      dl.onclick = () => download(item);
+      row.append(t, play, dl); box.appendChild(row);
+    });
+  }
 
   // ---------- init ----------
   $('apiKey').value = store.get('mv_key');
-  if (key()) loadVoices().then(n => msg($('keyMsg'), '登録済みの声: ' + n + ' 件', 'ok')).catch(e => msg($('keyMsg'), e.message, 'err'));
+  if (key()) loadVoices().then(n => msg($('keyMsg'), '使える声: ' + n + ' 種類', 'ok')).catch(e => msg($('keyMsg'), e.message, 'err'));
 })();
 </script>
 </body>
